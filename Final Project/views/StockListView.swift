@@ -1,10 +1,3 @@
-//
-//  StockListView.swift
-//  Final Project
-//
-//  Created by Emmanuel Makoye on 4/6/25.
-//
-
 import SwiftUI
 
 struct StockListView: View {
@@ -14,19 +7,55 @@ struct StockListView: View {
     @State private var defaultTickers: [String] = ["AAPL", "GOOGL", "MSFT", "TSLA", "AMZN"] {
         didSet {
             saveDefaultTickers()
+            Task { await fetchDefaultTickerData() }
         }
     }
+    @State private var tickerData: [String: PolygonPreviousClose] = [:]
     
     var body: some View {
         NavigationStack {
             List {
                 // Default Tickers Section (shown only when searchText is empty)
                 if searchText.isEmpty {
-                    Section(header: Text("Favorites")) {
+                    Section(header: HStack {
+                        Text("Stock")
+                            .font(.headline)
+                            .frame(width: 80, alignment: .leading)
+                        Spacer()
+                        Text("Price")
+                            .font(.headline)
+                            .frame(width: 80, alignment: .trailing)
+                        Text("Change")
+                            .font(.headline)
+                            .frame(width: 100, alignment: .trailing)
+                    }) {
                         ForEach(defaultTickers, id: \.self) { ticker in
                             NavigationLink(destination: ChartDetailView(ticker: ticker, apiKey: apiKey)) {
-                                Text(ticker)
-                                    .font(.headline)
+                                HStack {
+                                    Text(ticker)
+                                        .font(.body)
+                                        .frame(width: 80, alignment: .leading)
+                                    
+                                    if let data = tickerData[ticker] {
+                                        Spacer()
+                                        Text("$\(data.c, specifier: "%.2f")")
+                                            .font(.body)
+                                            .frame(width: 80, alignment: .trailing)
+                                        
+                                        let change = data.c - data.o
+                                        let percentChange = (change / data.o) * 100
+                                        Text("\(percentChange >= 0 ? "+" : "")\(percentChange, specifier: "%.2f")%")
+                                            .font(.body)
+                                            .foregroundColor(change >= 0 ? .green : .red)
+                                            .frame(width: 100, alignment: .trailing)
+                                    } else {
+                                        Spacer()
+                                        Text("Loading...")
+                                            .font(.body)
+                                            .foregroundColor(.gray)
+                                            .frame(maxWidth: .infinity, alignment: .trailing)
+                                    }
+                                }
                             }
                         }
                         .onDelete(perform: deleteTickers)
@@ -70,6 +99,7 @@ struct StockListView: View {
         }
         .onAppear {
             loadDefaultTickers()
+            Task { await fetchDefaultTickerData() }
         }
     }
     
@@ -98,6 +128,19 @@ struct StockListView: View {
         } catch {
             print("Search failed: \(error)")
             searchResults = []
+        }
+    }
+    
+    // Fetch price data for default tickers
+    private func fetchDefaultTickerData() async {
+        for ticker in defaultTickers {
+            do {
+                if let data = try await fetchPreviousClose(ticker: ticker, apiKey: apiKey) {
+                    tickerData[ticker] = data
+                }
+            } catch {
+                print("Failed to fetch data for \(ticker): \(error)")
+            }
         }
     }
     

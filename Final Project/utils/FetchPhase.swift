@@ -1,11 +1,3 @@
-//
-//  FetchPhase.swift
-//  Final Project
-//
-//  Created by Emmanuel Makoye on 4/6/25.
-//
-
-
 import Charts
 import Foundation
 import SwiftUI
@@ -68,6 +60,7 @@ enum ChartRange: String, CaseIterable, Identifiable {
 @MainActor
 class ChartViewModel: ObservableObject {
     @Published var fetchPhase = FetchPhase<ChartViewData>.initial
+    @Published var previousClose: PolygonPreviousClose?
     var chart: ChartViewData? { fetchPhase.value }
     
     @Published var ticker: String {
@@ -93,6 +86,17 @@ class ChartViewModel: ObservableObject {
         (selectedX != nil) ? .cyan : (chart?.lineColor ?? .cyan)
     }
     
+    // Calculate change and percentage change based on chart data
+    var priceChange: Double? {
+        guard let chart = chart, let first = chart.items.first?.value, let last = chart.items.last?.value else { return nil }
+        return last - first
+    }
+    
+    var percentChange: Double? {
+        guard let chart = chart, let first = chart.items.first?.value, let last = chart.items.last?.value, first != 0 else { return nil }
+        return ((last - first) / first) * 100
+    }
+    
     private let dateFormatter = DateFormatter()
     private let selectedValueDateFormatter: DateFormatter = {
         let df = DateFormatter()
@@ -109,6 +113,9 @@ class ChartViewModel: ObservableObject {
     func fetchData() async {
         do {
             fetchPhase = .fetching
+            
+            // Fetch previous close (still useful for current price)
+            previousClose = try await fetchPreviousClose(ticker: ticker, apiKey: apiKey)
             
             let toDate = Date()
             let fromDate = Calendar.current.date(byAdding: .day, value: -selectedRange.daysBack, to: toDate)!
