@@ -5,7 +5,6 @@
 //  Created by Emmanuel Makoye on 4/6/25.
 //
 
-
 import SwiftUI
 
 struct StockListView: View {
@@ -14,25 +13,27 @@ struct StockListView: View {
     @State private var searchResults: [PolygonTicker] = []
     @State private var defaultTickers: [String] = ["AAPL", "GOOGL", "MSFT", "TSLA", "AMZN"] {
         didSet {
-            saveDefaultTickers() // Persist changes
+            saveDefaultTickers()
         }
     }
     
     var body: some View {
         NavigationStack {
             List {
-                // Default Tickers Section
-                Section(header: Text("Favorites")) {
-                    ForEach(defaultTickers, id: \.self) { ticker in
-                        NavigationLink(destination: ChartDetailView(ticker: ticker, apiKey: apiKey)) {
-                            Text(ticker)
-                                .font(.headline)
+                // Default Tickers Section (shown only when searchText is empty)
+                if searchText.isEmpty {
+                    Section(header: Text("Favorites")) {
+                        ForEach(defaultTickers, id: \.self) { ticker in
+                            NavigationLink(destination: ChartDetailView(ticker: ticker, apiKey: apiKey)) {
+                                Text(ticker)
+                                    .font(.headline)
+                            }
                         }
+                        .onDelete(perform: deleteTickers)
                     }
-                    .onDelete(perform: deleteTickers)
                 }
                 
-                // Search Results Section
+                // Search Results Section (shown when there are results)
                 if !searchResults.isEmpty {
                     Section(header: Text("Search Results")) {
                         ForEach(searchResults, id: \.ticker) { ticker in
@@ -68,7 +69,7 @@ struct StockListView: View {
             }
         }
         .onAppear {
-            loadDefaultTickers() // Load persisted tickers on appear
+            loadDefaultTickers()
         }
     }
     
