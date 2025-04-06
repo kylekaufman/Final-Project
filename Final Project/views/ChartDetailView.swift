@@ -49,5 +49,5 @@ struct ChartDetailView: View {
 }
 
 #Preview {
-    ChartDetailView(ticker: "AAPL", apiKey: "lonqIUMp0Bztqiqqa_yeTLDZQVs3frHG")
+    ChartDetailView(ticker: "AAPL", apiKey: "API_KEY")
 }
