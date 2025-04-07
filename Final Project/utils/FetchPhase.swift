@@ -33,6 +33,7 @@ enum FetchPhase<T>: Equatable where T: Equatable {
 }
 
 enum ChartRange: String, CaseIterable, Identifiable {
+    case today = "Today"
     case lastFiveDays = "5D"
     case lastMonth = "1M"
     case lastYear = "1Y"
@@ -42,6 +43,7 @@ enum ChartRange: String, CaseIterable, Identifiable {
     
     var dateFormat: String {
         switch self {
+        case .today: return "HH:mm"
         case .lastFiveDays: return "MM/dd HH:mm"
         case .lastMonth, .lastYear, .lastFiveYears: return "MM/dd/yy"
         }
@@ -49,12 +51,31 @@ enum ChartRange: String, CaseIterable, Identifiable {
     
     var daysBack: Int {
         switch self {
+        case .today: return 0
         case .lastFiveDays: return 5
         case .lastMonth: return 30
         case .lastYear: return 365
         case .lastFiveYears: return 365 * 5
         }
     }
+    var timespan: String {
+            switch self {
+            case .today: return "minute"
+            case .lastFiveDays: return "hour"
+            case .lastMonth: return "day"
+            case .lastYear, .lastFiveYears: return "day"
+            }
+        }
+    
+    var multiplier: Int {
+            switch self {
+            case .today: return 5
+            case .lastFiveDays: return 1
+            case .lastMonth: return 1
+            case .lastYear: return 1
+            case .lastFiveYears: return 5
+            }
+        }
 }
 
 @MainActor
@@ -70,7 +91,7 @@ class ChartViewModel: ObservableObject {
     }
     let apiKey: String
     
-    @Published var selectedRange: ChartRange = .lastFiveDays {
+    @Published var selectedRange: ChartRange = .today {
         didSet {
             Task { await fetchData() }
         }
@@ -111,41 +132,59 @@ class ChartViewModel: ObservableObject {
     }
     
     func fetchData() async {
-        do {
-            fetchPhase = .fetching
-            
-            // Fetch previous close (still useful for current price)
-            previousClose = try await fetchPreviousClose(ticker: ticker, apiKey: apiKey)
-            
-            let toDate = Date()
-            let fromDate = Calendar.current.date(byAdding: .day, value: -selectedRange.daysBack, to: toDate)!
-            let dateFormatter = DateFormatter()
-            dateFormatter.dateFormat = "yyyy-MM-dd"
-            let from = dateFormatter.string(from: fromDate)
-            let to = dateFormatter.string(from: toDate)
-            
-            if let cachedItems = loadFromFile(for: selectedRange) {
-                print("Loaded \(cachedItems.count) items from file for \(ticker) \(selectedRange.rawValue)")
-                if !cachedItems.isEmpty {
-                    fetchPhase = .success(transformChartViewData(cachedItems))
+            do {
+                fetchPhase = .fetching
+                
+                // Fetch previous close (optional, for reference)
+                previousClose = try await fetchPreviousClose(ticker: ticker, apiKey: apiKey)
+                
+                let toDate = Date()
+                let fromDate: Date
+                let dateFormatter = DateFormatter()
+                dateFormatter.dateFormat = "yyyy-MM-dd"
+                
+                // For "Today", use the current date as both from and to
+                if selectedRange == .today {
+                    fromDate = Calendar.current.startOfDay(for: toDate)
+                } else {
+                    fromDate = Calendar.current.date(byAdding: .day, value: -selectedRange.daysBack, to: toDate)!
+                }
+                
+                let from = dateFormatter.string(from: fromDate)
+                let to = dateFormatter.string(from: toDate)
+                
+                // Check cache first
+                if let cachedItems = loadFromFile(for: selectedRange) {
+                    print("Loaded \(cachedItems.count) items from file for \(ticker) \(selectedRange.rawValue)")
+                    if !cachedItems.isEmpty {
+                        fetchPhase = .success(transformChartViewData(cachedItems))
+                        return
+                    }
+                }
+                
+                // Fetch historical data with appropriate timespan
+                let items = try await fetchHistoricalChartData(
+                    ticker: ticker,
+                    from: from,
+                    to: to,
+                    multiplier: selectedRange.multiplier,
+                    timespan: selectedRange.timespan,
+                    apiKey: apiKey
+                )
+                
+                guard !items.isEmpty else {
+                    print("Empty API response for \(ticker)")
+                    fetchPhase = .empty
                     return
                 }
+                
+                saveToFile(items, for: selectedRange)
+                fetchPhase = .success(transformChartViewData(items))
+            } catch {
+                print("Failed to fetch for \(ticker): \(error)")
+                fetchPhase = .failure(error)
             }
-            
-            let items = try await fetchHistoricalChartData(ticker: ticker, from: from, to: to, apiKey: apiKey)
-            guard !items.isEmpty else {
-                print("Empty API response for \(ticker)")
-                fetchPhase = .empty
-                return
-            }
-            
-            saveToFile(items, for: selectedRange)
-            fetchPhase = .success(transformChartViewData(items))
-        } catch {
-            print("Failed to fetch for \(ticker): \(error)")
-            fetchPhase = .failure(error)
         }
-    }
     
     func transformChartViewData(_ items: [ChartViewItem]) -> ChartViewData {
         let (xAxisChartData, chartItems) = xAxisChartDataAndItems(items)

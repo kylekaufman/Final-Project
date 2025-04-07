@@ -17,20 +17,20 @@ struct PolygonOHLC: Codable {
     let c: Double // close price
 }
 
-func fetchHistoricalChartData(ticker: String, from: String, to: String, apiKey: String) async throws -> [ChartViewItem] {
-    let urlString = "https://api.polygon.io/v2/aggs/ticker/\(ticker)/range/1/day/\(from)/\(to)?adjusted=true&sort=asc&limit=2000&apiKey=\(apiKey)"
-    
-    guard let url = URL(string: urlString) else { return [] }
-    let (data, _) = try await URLSession.shared.data(from: url)
-    let decoded = try JSONDecoder().decode(PolygonAggsResponse.self, from: data)
-    
-    return decoded.results.map {
-        ChartViewItem(
-            timestamp: Date(timeIntervalSince1970: TimeInterval($0.t / 1000)),
-            value: $0.c
-        )
+func fetchHistoricalChartData(ticker: String, from: String, to: String, multiplier: Int, timespan: String, apiKey: String) async throws -> [ChartViewItem] {
+        let urlString = "https://api.polygon.io/v2/aggs/ticker/\(ticker)/range/\(multiplier)/\(timespan)/\(from)/\(to)?adjusted=true&sort=asc&apiKey=\(apiKey)"
+        guard let url = URL(string: urlString) else { throw URLError(.badURL) }
+        
+        let (data, _) = try await URLSession.shared.data(from: url)
+        let response = try JSONDecoder().decode(PolygonAggsResponse.self, from: data)
+        
+        return response.results.map { result in
+            ChartViewItem(
+                timestamp: Date(timeIntervalSince1970: TimeInterval(result.t / 1000)),
+                value: result.c
+            )
+        }
     }
-}
 
 // Quote (Previous Close)
 struct PolygonPreviousCloseResponse: Codable {

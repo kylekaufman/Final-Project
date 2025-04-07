@@ -43,8 +43,9 @@ struct ChartDetailView: View {
                 Text("No data available for \(vm.ticker)")
             }
             
+            
             // Range Picker and Buttons
-            HStack {
+            VStack(spacing: 20) {
                 Picker("Time Range", selection: $vm.selectedRange) {
                     ForEach(ChartRange.allCases) { range in
                         Text(range.rawValue).tag(range)
@@ -52,9 +53,8 @@ struct ChartDetailView: View {
                 }
                 .pickerStyle(.segmented)
                 
-                Spacer() // Pushes buttons to the far right
-                
                 HStack(spacing: 10) {
+                    Spacer()
                     Button("Buy") {
                         print("Buy action for \(vm.ticker)")
                         // Add buy logic here
