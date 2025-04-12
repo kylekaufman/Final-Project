@@ -70,7 +70,11 @@ struct StockListView: View {
                                     }
 
                             }
-                            .onDelete(perform: deleteTickers)
+                                .onDelete(perform: { indexSet in
+                                    withAnimation {
+                                        deleteTickers(at: indexSet)
+                                    }
+                                })
                         }
                     }
                     
@@ -117,8 +121,9 @@ struct StockListView: View {
                         await performSearch(query: newValue)
                     }
                 }
-                
+            
                 // Charts for the first three favorite tickers
+                    /*
                     VStack(spacing: 150) {
                         ForEach(defaultTickers.prefix(1), id: \.self) { ticker in
                             if let vm = chartViewModels[ticker], let chartData = vm.chart {
@@ -136,6 +141,7 @@ struct StockListView: View {
                         }
                     }
                     .padding()
+                    */
                 }
             }
         .onAppear {
