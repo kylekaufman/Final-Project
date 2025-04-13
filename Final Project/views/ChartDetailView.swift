@@ -79,11 +79,13 @@ struct ChartDetailView: View {
             
             VStack {
                 HStack {
-                    Stepper("Quantity: \(selectedQuantity)", value: $selectedQuantity, in: 1...1000)
+                Stepper("Quantity: \(selectedQuantity)", value: $selectedQuantity, in: 1...1000)
+                
                     Button("Buy") {
                         buyStock()
                     }
                     .padding(7.5)
+                    .padding(.horizontal)
                     .background(.green)
                     .clipShape(.buttonBorder)
                     Button("Sell") {
@@ -96,6 +98,7 @@ struct ChartDetailView: View {
                         }
                     }
                     .padding(7.5)
+                    .padding(.horizontal)
                     .background(.red)
                     .clipShape(.buttonBorder)
                 }
