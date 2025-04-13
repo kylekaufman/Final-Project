@@ -19,6 +19,7 @@ struct ChartDetailView: View {
     private func buyStock() {
         if let stockItem = getUserStock() {
             stockItem.quantity += selectedQuantity
+            try? modelContext.save()
         } else {
             modelContext.insert(StockItem(ticker: vm.ticker, quantity: selectedQuantity))
         }
@@ -26,7 +27,8 @@ struct ChartDetailView: View {
     
     private func sellStock() {
         if let stockItem = getUserStock() {
-            stockItem.quantity -= max(selectedQuantity, stockItem.quantity)
+            stockItem.quantity -= min(selectedQuantity, stockItem.quantity)
+            try? modelContext.save()
             // Delete record if user sells all stock
             if stockItem.quantity <= 0 {
                 modelContext.delete(stockItem)
@@ -79,8 +81,8 @@ struct ChartDetailView: View {
             
             VStack {
                 HStack {
-                Stepper("Quantity: \(selectedQuantity)", value: $selectedQuantity, in: 1...1000)
-                
+                    Stepper("Quantity: \(selectedQuantity)", value: $selectedQuantity, in: 1...1000)
+                    
                     Button("Buy") {
                         buyStock()
                     }
@@ -103,17 +105,24 @@ struct ChartDetailView: View {
                     .clipShape(.buttonBorder)
                 }
                 .foregroundStyle(.black)
-                
             }
             .padding(.vertical)
             Spacer()
-            Text(portfolio.count == 0 ? "" : "Stock Portfolio")
-            List {
-                ForEach(portfolio) { item in
+            if let stockItem = getUserStock() {
+                VStack {
+                    Text("Holdings")
+                        .font(.title2)
                     HStack {
-                        Text(item.ticker)
-                        Text("\(item.quantity)")
-                        
+                        Text("Quantity:")
+                        Spacer()
+                        Text("\(stockItem.quantity)")
+                    }
+                    HStack {
+                        Text("Value:")
+                        Spacer()
+                        if let previousClose = vm.previousClose {
+                            Text("$\(String(format: "%.2f", Double(stockItem.quantity) * previousClose.c))")
+                        }
                     }
                 }
             }
