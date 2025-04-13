@@ -9,7 +9,7 @@ import SwiftUI
 
 struct ContentView: View {
     var body: some View {
-        StockListView(apiKey: "API_KEY")
+        StockListView(apiKey: "lonqIUMp0Bztqiqqa_yeTLDZQVs3frHG")
     }
 }
 

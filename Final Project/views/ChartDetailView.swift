@@ -1,10 +1,37 @@
 import SwiftUI
+import SwiftData
 
 struct ChartDetailView: View {
     @StateObject private var vm: ChartViewModel
+    @State private var showAlert: Bool = false
+    @State private var selectedQuantity: Int = 1
+    @Environment(\.modelContext) private var modelContext
+    @Query private var portfolio: [StockItem] // All currently held stocks
     
     init(ticker: String, apiKey: String) {
         _vm = StateObject(wrappedValue: ChartViewModel(ticker: ticker, apiKey: apiKey))
+    }
+    
+    private func getUserStock() -> StockItem? {
+        return portfolio.filter { $0.ticker == vm.ticker } .first
+    }
+    
+    private func buyStock() {
+        if let stockItem = getUserStock() {
+            stockItem.quantity += selectedQuantity
+        } else {
+            modelContext.insert(StockItem(ticker: vm.ticker, quantity: selectedQuantity))
+        }
+    }
+    
+    private func sellStock() {
+        if let stockItem = getUserStock() {
+            stockItem.quantity -= max(selectedQuantity, stockItem.quantity)
+            // Delete record if user sells all stock
+            if stockItem.quantity <= 0 {
+                modelContext.delete(stockItem)
+            }
+        }
     }
     
     var body: some View {
@@ -43,37 +70,66 @@ struct ChartDetailView: View {
                 Text("No data available for \(vm.ticker)")
             }
             
-            
-            // Range Picker and Buttons
-            VStack(spacing: 20) {
-                Picker("Time Range", selection: $vm.selectedRange) {
-                    ForEach(ChartRange.allCases) { range in
-                        Text(range.rawValue).tag(range)
-                    }
-                }
-                .pickerStyle(.segmented)
-                
-                HStack(spacing: 10) {
-                    Spacer()
-                    Button("Buy") {
-                        print("Buy action for \(vm.ticker)")
-                        // Add buy logic here
-                    }
-                    .buttonStyle(.borderedProminent)
-                    .tint(.green)
-                    
-                    Button("Sell") {
-                        print("Sell action for \(vm.ticker)")
-                        // Add sell logic here
-                    }
-                    .buttonStyle(.borderedProminent)
-                    .tint(.red) // Warning color (red)
+            Picker("Time Range", selection: $vm.selectedRange) {
+                ForEach(ChartRange.allCases) { range in
+                    Text(range.rawValue).tag(range)
                 }
             }
-            .padding()
+            .pickerStyle(.segmented)
+            
+            VStack {
+                HStack {
+                    Stepper("Quantity: \(selectedQuantity)", value: $selectedQuantity, in: 1...1000)
+                    Button("Buy") {
+                        buyStock()
+                    }
+                    .padding(7.5)
+                    .background(.green)
+                    .clipShape(.buttonBorder)
+                    Button("Sell") {
+                        if let stockItem = getUserStock() {
+                            if selectedQuantity > stockItem.quantity {
+                                showAlert = true
+                            } else {
+                                sellStock()
+                            }
+                        }
+                    }
+                    .padding(7.5)
+                    .background(.red)
+                    .clipShape(.buttonBorder)
+                }
+                .foregroundStyle(.black)
+                
+            }
+            .padding(.vertical)
+            Spacer()
+            Text(portfolio.count == 0 ? "" : "Stock Portfolio")
+            List {
+                ForEach(portfolio) { item in
+                    HStack {
+                        Text(item.ticker)
+                        Text("\(item.quantity)")
+                        
+                    }
+                }
+            }
         }
+        .padding()
         .navigationTitle(vm.ticker)
         .task { await vm.fetchData() }
+        .alert("Error", isPresented: $showAlert, presenting: selectedQuantity) { quantity in
+            Button(role: .destructive) {
+                sellStock()
+            } label: {
+                Text("Sell")
+            }
+            Button("Cancel", role: .cancel) {
+                // Do nothing
+            }
+        } message: { quantity in
+            Text("You have tried to sell more stock than you own. You can continue to sell as many as you have (\(getUserStock()?.quantity ?? 0)) or cancel the action.")
+        }
     }
 }
 
