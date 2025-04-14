@@ -116,7 +116,7 @@ struct StockListView: View {
                 }
                 .navigationTitle("STOKY")
                 .searchable(text: $searchText, prompt: "Search for a stock (e.g., AAPL)")
-                .onChange(of: searchText) { newValue in
+                .onChange(of: searchText) { _, newValue in
                     Task {
                         await performSearch(query: newValue)
                     }
@@ -149,7 +149,7 @@ struct StockListView: View {
             Task { await fetchDefaultTickerData() }
             setupChartViewModels()
         }
-        .onChange(of: defaultTickers) { _ in
+        .onChange(of: defaultTickers) { _, _ in
             setupChartViewModels()
         }
     }
