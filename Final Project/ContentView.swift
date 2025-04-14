@@ -8,19 +8,41 @@
 import SwiftUI
 
 struct ContentView: View {
-    var body: some View {
-        TabView {
-            Tab("Discover", systemImage: "magnifyingglass") {
-                StockListView(apiKey: "API_KEY")
-            }
-            
-            Tab("Profile", systemImage: "person.circle.fill") {
-//                ProfileView()
+    @EnvironmentObject private var authManager: AuthManager
+        
+        var body: some View {
+            if authManager.currentUser == nil {
+                StartView()
+                    .environmentObject(authManager)
+                    .transition(.opacity)
+            } else {
+                HomeView()
+                    .environmentObject(authManager)
             }
         }
     }
-}
+
+    // MARK: - Home view
+    struct HomeView: View {
+        @EnvironmentObject private var authManager: AuthManager
+        
+        var body: some View {
+            TabView {
+                StockListView(apiKey: "API_KEY")
+                    .tabItem {
+                        Label("Home", systemImage: "house.fill")
+                    }
+                
+                ProfileView()
+                    .tabItem {
+                        Label("Profile", systemImage: "person.crop.circle.fill")
+                    }
+            }
+            .accentColor(.purple)
+        }
+    }
 
 #Preview {
     ContentView()
+        .environmentObject(AuthManager())
 }

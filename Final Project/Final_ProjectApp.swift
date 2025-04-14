@@ -10,10 +10,12 @@ import SwiftData
 
 @main
 struct Final_ProjectApp: App {
+    @StateObject private var authManager = AuthManager()
     var body: some Scene {
         WindowGroup {
             ContentView()
         }
         .modelContainer(for: StockItem.self)
+        .environmentObject(authManager)
     }
 }
