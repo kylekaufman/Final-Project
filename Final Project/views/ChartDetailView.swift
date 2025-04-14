@@ -12,30 +12,6 @@ struct ChartDetailView: View {
         _vm = StateObject(wrappedValue: ChartViewModel(ticker: ticker, apiKey: apiKey))
     }
     
-    private func getUserStock() -> StockItem? {
-        return portfolio.filter { $0.ticker == vm.ticker } .first
-    }
-    
-    private func buyStock() {
-        if let stockItem = getUserStock() {
-            stockItem.quantity += selectedQuantity
-            try? modelContext.save()
-        } else {
-            modelContext.insert(StockItem(ticker: vm.ticker, quantity: selectedQuantity))
-        }
-    }
-    
-    private func sellStock() {
-        if let stockItem = getUserStock() {
-            stockItem.quantity -= min(selectedQuantity, stockItem.quantity)
-            try? modelContext.save()
-            // Delete record if user sells all stock
-            if stockItem.quantity <= 0 {
-                modelContext.delete(stockItem)
-            }
-        }
-    }
-    
     var body: some View {
         VStack {
             // Price and Changes Header
@@ -141,6 +117,30 @@ struct ChartDetailView: View {
             }
         } message: { quantity in
             Text("You have tried to sell more stock than you own. You can continue to sell as many as you have (\(getUserStock()?.quantity ?? 0)) or cancel the action.")
+        }
+    }
+    
+    private func getUserStock() -> StockItem? {
+        return portfolio.filter { $0.ticker == vm.ticker } .first
+    }
+    
+    private func buyStock() {
+        if let stockItem = getUserStock() {
+            stockItem.quantity += selectedQuantity
+            try? modelContext.save()
+        } else {
+            modelContext.insert(StockItem(ticker: vm.ticker, quantity: selectedQuantity))
+        }
+    }
+    
+    private func sellStock() {
+        if let stockItem = getUserStock() {
+            stockItem.quantity -= min(selectedQuantity, stockItem.quantity)
+            try? modelContext.save()
+            // Delete record if user sells all stock
+            if stockItem.quantity <= 0 {
+                modelContext.delete(stockItem)
+            }
         }
     }
 }
