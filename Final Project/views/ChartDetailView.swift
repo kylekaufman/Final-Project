@@ -83,7 +83,6 @@ struct ChartDetailView: View {
                     .background(.red)
                     .clipShape(.buttonBorder)
                 }
-                .foregroundStyle(.black)
             }
             .padding(.vertical)
             
