@@ -10,7 +10,7 @@ import SwiftData
 
 @Model
 class StockItem {
-    @Attribute(.unique) var ticker: String
+    @Attribute(.unique) var ticker: String // Use as id, saving StockItem with same ticker name will throw error on save()
     var quantity: Int
     
     init(ticker: String, quantity: Int = 0) {

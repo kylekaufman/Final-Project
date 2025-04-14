@@ -55,6 +55,7 @@ struct ChartDetailView: View {
             }
             .pickerStyle(.segmented)
             
+            // Allow user to simulate buying/selling stocks
             VStack {
                 HStack {
                     Stepper("Quantity: \(selectedQuantity)", value: $selectedQuantity, in: 1...1000)
@@ -66,8 +67,10 @@ struct ChartDetailView: View {
                     .padding(.horizontal)
                     .background(.green)
                     .clipShape(.buttonBorder)
+                    
                     Button("Sell") {
                         if let stockItem = getUserStock() {
+                            // Do not allow user to sell more stock than they own
                             if selectedQuantity > stockItem.quantity {
                                 showAlert = true
                             } else {
@@ -83,7 +86,10 @@ struct ChartDetailView: View {
                 .foregroundStyle(.black)
             }
             .padding(.vertical)
+            
             Spacer()
+            
+            // Show info about user's holding in this particular stock
             if let stockItem = getUserStock() {
                 VStack {
                     Text("Holdings")
