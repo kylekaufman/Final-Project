@@ -9,7 +9,15 @@ import SwiftUI
 
 struct ContentView: View {
     var body: some View {
-        StockListView(apiKey: "API_KEY")
+        TabView {
+            Tab("Discover", systemImage: "magnifyingglass") {
+                StockListView(apiKey: "API_KEY")
+            }
+            
+            Tab("Profile", systemImage: "person.circle.fill") {
+//                ProfileView()
+            }
+        }
     }
 }
 
