@@ -222,5 +222,5 @@ struct StockListView: View {
 }
 
 #Preview {
-    StockListView(apiKey: "API_KEY")
+    StockListView(apiKey: Config.apiKey)
 }

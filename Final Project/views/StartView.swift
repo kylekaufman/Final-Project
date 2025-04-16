@@ -4,11 +4,16 @@
 //  Created by Emmanuel Makoye on 3/1/25.
 //
 
+
 import SwiftUI
+import SwiftData
 
 struct StartView: View {
     @EnvironmentObject private var authManager: AuthManager
     @Environment(\.colorScheme) var colorScheme
+    @Environment(\.modelContext) private var modelContext
+    @State private var showingPersistenceTest = false
+    @State private var persistenceMessage = ""
     
     private var backgroundGradient: LinearGradient {
         LinearGradient(
@@ -100,22 +105,45 @@ struct StartView: View {
                 .padding(.top, 60)
             }
             .navigationBarHidden(true)
+            .onAppear {
+                // Provide the model context to the auth manager
+                authManager.setModelContext(modelContext)
+                
+                // Try to restore previous guest session
+                if authManager.restoreLastGuestUser() {
+                    print("Restored previous guest session")
+                }
+            }
+            .alert("User Data Persistence Test", isPresented: $showingPersistenceTest) {
+                Button("Continue") {
+                    showingPersistenceTest = false
+                }
+            } message: {
+                Text(persistenceMessage)
+            }
         }
     }
     
     // MARK: - Guest Action
     private func continueAsGuest() {
-        authManager.currentUser = Profile(
-            userId: UUID().uuidString,
-            username: "Guest\(Int.random(in: 1000...9999))",
-            email: "guest+\(Int.random(in: 1000...9999))@stoky.com",
-            role: UserRole.guest,
-            status: "active",
-            firstName: "Guest",
-            lastName: "User",
-            phoneNumber: "000-000-\(Int.random(in: 1000...9999))",
-            profilePictureURL: ""
-        )
+        // Always create a new guest user (old one was deleted during logout)
+        authManager.createGuestUser()
+        testDataPersistence(wasRestored: false)
+    }
+    
+    // Test if the data was persisted correctly
+    private func testDataPersistence(wasRestored: Bool) {
+        if let userData = authManager.userSwiftDataModel {
+            if wasRestored {
+                persistenceMessage = "Successfully restored previous guest user: \(userData.username) with account balance: $\(String(format: "%.2f", userData.accountBalance))"
+            } else {
+                persistenceMessage = "New guest user created and persisted: \(userData.username) with starting balance: $\(String(format: "%.2f", userData.accountBalance))"
+            }
+        } else {
+            persistenceMessage = "Warning: User created but data persistence failed."
+        }
+        
+        showingPersistenceTest = true
     }
 }
 
@@ -124,10 +152,12 @@ struct StartView: View {
     StartView()
         .environmentObject(AuthManager())
         .preferredColorScheme(.light)
+        .modelContainer(for: [UserData.self, StockItem.self])
 }
 
 #Preview("Dark Mode") {
     StartView()
         .environmentObject(AuthManager())
         .preferredColorScheme(.dark)
+        .modelContainer(for: [UserData.self, StockItem.self])
 }

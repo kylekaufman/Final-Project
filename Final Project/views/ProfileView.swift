@@ -1,11 +1,13 @@
 //
 //  ProfileView.swift
-//  RentalApp
+//  Final Project
 //
 //  Created by Emmanuel Makoye on 2/27/25.
 //
 
+
 import SwiftUI
+import SwiftData
 
 struct ProfileView: View {
     @EnvironmentObject private var authManager: AuthManager
@@ -14,10 +16,25 @@ struct ProfileView: View {
     @State private var phone: String = ""
     @State private var showingImagePicker = false
     @State private var selectedImage: UIImage?
+    @AppStorage("isDarkMode") private var isDarkMode = false
+    @State private var showGuestLogoutConfirmation = false
     
     var body: some View {
         NavigationView {
             Form {
+                // Appearance Section (New)
+                Section(header: Text("Appearance")) {
+                    Toggle(isOn: $isDarkMode) {
+                        HStack {
+                            Image(systemName: isDarkMode ? "moon.fill" : "sun.max.fill")
+                                .foregroundColor(isDarkMode ? .purple : .orange)
+                            Text("Dark Mode")
+                        }
+                    }
+                    .onChange(of: isDarkMode) { _, newValue in
+                        setAppAppearance(darkMode: newValue)
+                    }
+                }
                 // Profile Picture Section
                 Section(header: Text("Profile Picture")) {
                     HStack {
@@ -65,6 +82,11 @@ struct ProfileView: View {
                             Text("Phone: \(user.phoneNumber)")
                         }
                         Text("Email: \(user.email)") // Always show email
+                        
+                        if let userData = authManager.userSwiftDataModel, user.role == .guest {
+                            Text("Account Type: Guest")
+                                .foregroundColor(.orange)
+                        }
                     } else {
                         Text("No user data available")
                             .foregroundColor(.gray)
@@ -85,12 +107,18 @@ struct ProfileView: View {
                 // Actions Section
                 Section {
                     Button("Save Changes") {
-                       
+                        // Update user profile information logic would go here
                     }
                     .disabled(firstName.isEmpty && lastName.isEmpty && phone.isEmpty)
                     
                     Button("Logout") {
-                        authManager.logout()
+                        // Show confirmation alert for guest users
+                        if let user = authManager.currentUser, user.role == .guest {
+                            showGuestLogoutConfirmation = true
+                        } else {
+                            // Regular logout for non-guest users
+                            authManager.logout()
+                        }
                     }
                     .foregroundColor(.red)
                 }
@@ -108,7 +136,22 @@ struct ProfileView: View {
                     selectedImage = image
                 }
             }
+            .alert("Logout Confirmation", isPresented: $showGuestLogoutConfirmation) {
+                Button("Cancel", role: .cancel) { }
+                
+                Button("Logout", role: .destructive) {
+                    authManager.logout()
+                }
+            } message: {
+                Text("Your guest account data will be permanently deleted. This action cannot be undone.")
+            }
         }
+    }
+    
+    // Function to set app appearance
+    private func setAppAppearance(darkMode: Bool) {
+        // Use the AppearanceManager to apply the setting
+        AppearanceManager.shared.setDarkMode(darkMode)
     }
 }
 
@@ -149,4 +192,5 @@ struct ImagePicker: UIViewControllerRepresentable {
 #Preview {
     ProfileView()
         .environmentObject(AuthManager())
+        .modelContainer(for: [UserData.self, StockItem.self])
 }

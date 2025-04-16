@@ -4,9 +4,11 @@ import SwiftData
 struct ChartDetailView: View {
     @StateObject private var vm: ChartViewModel
     @State private var showAlert: Bool = false
+    @State private var alertMessage: String = ""
     @State private var selectedQuantity: Int = 1
     @Environment(\.modelContext) private var modelContext
     @Query private var portfolio: [StockItem] // All currently held stocks
+    @EnvironmentObject private var authManager: AuthManager
     
     init(ticker: String, apiKey: String) {
         _vm = StateObject(wrappedValue: ChartViewModel(ticker: ticker, apiKey: apiKey))
@@ -55,6 +57,20 @@ struct ChartDetailView: View {
             }
             .pickerStyle(.segmented)
             
+            // Account Balance (New)
+            if let userData = authManager.userSwiftDataModel {
+                HStack {
+                    Text("Account Balance:")
+                    Spacer()
+                    Text("$\(String(format: "%.2f", userData.accountBalance))")
+                        .fontWeight(.bold)
+                }
+                .padding()
+                .background(Color.gray.opacity(0.1))
+                .cornerRadius(8)
+                .padding(.horizontal)
+            }
+            
             // Allow user to simulate buying/selling stocks
             VStack {
                 HStack {
@@ -66,21 +82,16 @@ struct ChartDetailView: View {
                     .padding(7.5)
                     .padding(.horizontal)
                     .background(.green)
+                    .foregroundColor(.white)
                     .clipShape(.buttonBorder)
                     
                     Button("Sell") {
-                        if let stockItem = getUserStock() {
-                            // Do not allow user to sell more stock than they own
-                            if selectedQuantity > stockItem.quantity {
-                                showAlert = true
-                            } else {
-                                sellStock()
-                            }
-                        }
+                        sellStock()
                     }
                     .padding(7.5)
                     .padding(.horizontal)
                     .background(.red)
+                    .foregroundColor(.white)
                     .clipShape(.buttonBorder)
                 }
             }
@@ -106,50 +117,115 @@ struct ChartDetailView: View {
                         }
                     }
                 }
+                .padding()
+                .background(Color.gray.opacity(0.1))
+                .cornerRadius(8)
+                .padding()
             }
         }
         .padding()
         .navigationTitle(vm.ticker)
         .task { await vm.fetchData() }
-        .alert("Error", isPresented: $showAlert, presenting: selectedQuantity) { quantity in
-            Button(role: .destructive) {
-                sellStock()
-            } label: {
-                Text("Sell")
-            }
-            Button("Cancel", role: .cancel) {
-                // Do nothing
-            }
-        } message: { quantity in
-            Text("You have tried to sell more stock than you own. You can continue to sell as many as you have (\(getUserStock()?.quantity ?? 0)) or cancel the action.")
+        .alert("Stock Transaction", isPresented: $showAlert) {
+            Button("OK", role: .cancel) { }
+        } message: {
+            Text(alertMessage)
         }
     }
     
     private func getUserStock() -> StockItem? {
-        return portfolio.filter { $0.ticker == vm.ticker } .first
+        return portfolio.filter { $0.ticker == vm.ticker }.first
     }
     
     private func buyStock() {
+        guard let previousClose = vm.previousClose else {
+            alertMessage = "Cannot buy: Stock price unavailable"
+            showAlert = true
+            return
+        }
+        
+        let totalCost = previousClose.c * Double(selectedQuantity)
+        
+        // Check if user has enough funds
+        guard let userData = authManager.userSwiftDataModel, userData.accountBalance >= totalCost else {
+            alertMessage = "Insufficient funds for this purchase"
+            showAlert = true
+            return
+        }
+        
+        // Update user balance
+        let newBalance = userData.accountBalance - totalCost
+        _ = authManager.updateAccountBalance(
+            amount: newBalance,
+            transactionType: .buy,
+            ticker: vm.ticker,
+            quantity: selectedQuantity,
+            pricePerShare: previousClose.c
+        )
+        
+        // Update stock holdings
         if let stockItem = getUserStock() {
             stockItem.quantity += selectedQuantity
             try? modelContext.save()
         } else {
             modelContext.insert(StockItem(ticker: vm.ticker, quantity: selectedQuantity))
         }
+        
+        alertMessage = "Successfully purchased \(selectedQuantity) shares of \(vm.ticker) for $\(String(format: "%.2f", totalCost))"
+        showAlert = true
     }
     
     private func sellStock() {
-        if let stockItem = getUserStock() {
-            stockItem.quantity -= min(selectedQuantity, stockItem.quantity)
-            try? modelContext.save()
-            // Delete record if user sells all stock
-            if stockItem.quantity <= 0 {
-                modelContext.delete(stockItem)
-            }
+        guard let stockItem = getUserStock() else {
+            alertMessage = "You don't own any shares of \(vm.ticker)"
+            showAlert = true
+            return
         }
+        
+        // Don't allow selling more than owned
+        if selectedQuantity > stockItem.quantity {
+            alertMessage = "You only have \(stockItem.quantity) shares to sell"
+            showAlert = true
+            return
+        }
+        
+        guard let previousClose = vm.previousClose else {
+            alertMessage = "Cannot sell: Stock price unavailable"
+            showAlert = true
+            return
+        }
+        
+        let totalValue = previousClose.c * Double(selectedQuantity)
+        
+        // Update user balance
+        if let userData = authManager.userSwiftDataModel {
+            let newBalance = userData.accountBalance + totalValue
+            _ = authManager.updateAccountBalance(
+                amount: newBalance,
+                transactionType: .sell,
+                ticker: vm.ticker,
+                quantity: selectedQuantity,
+                pricePerShare: previousClose.c
+            )
+        }
+        
+        // Update stock holdings
+        stockItem.quantity -= selectedQuantity
+        
+        // Delete record if user sells all stock
+        if stockItem.quantity <= 0 {
+            modelContext.delete(stockItem)
+        }
+        
+        try? modelContext.save()
+        
+        alertMessage = "Successfully sold \(selectedQuantity) shares of \(vm.ticker) for $\(String(format: "%.2f", totalValue))"
+        showAlert = true
     }
 }
 
 #Preview {
-    ChartDetailView(ticker: "AAPL", apiKey: "API_KEY")
+    ChartDetailView(ticker: "AAPL", apiKey: Config.apiKey)
+        .environmentObject(AuthManager())
+        .modelContainer(for: [UserData.self, StockItem.self])
 }
